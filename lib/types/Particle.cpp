@@ -3,7 +3,8 @@
 namespace types {
 
 Particle::Particle(int id, Vector2D position, Vector2D velocity, double mass, double radius)
-    : id(id), radius(radius), mass(mass), used(false), velocity(velocity), position(position) {}
+    : id(id), position(position), previousPosition(position), velocity(velocity),
+      radius(radius), mass(mass), used(false) {}
 
 int Particle::getId() const { return id; }
 
@@ -12,6 +13,9 @@ void Particle::setPosition(Vector2D position) { this->position = position; }
 
 Vector2D Particle::getVelocity() const { return velocity; }
 void Particle::setVelocity(Vector2D velocity) { this->velocity = velocity; }
+
+Vector2D Particle::getPreviousPosition() const { return previousPosition; }
+void Particle::setPreviousPosition(Vector2D previousPosition) { this->previousPosition = previousPosition; }
 
 Vector2D Particle::getAcceleration() const { return acceleration; }
 void Particle::setAcceleration(Vector2D acceleration) { this->acceleration = acceleration; };

@@ -22,6 +22,9 @@ public:
     Vector2D getVelocity() const;
     void setVelocity(Vector2D velocity);
 
+    Vector2D getPreviousPosition() const;
+    void setPreviousPosition(Vector2D previousPosition);
+
     Vector2D getAcceleration() const;
     void setAcceleration(Vector2D acceleration);
 
@@ -37,6 +40,7 @@ private:
     int id;
 
     Vector2D position;
+    Vector2D previousPosition;  // r(t-dt), lo necesita Verlet
     Vector2D velocity;
     Vector2D acceleration;
 

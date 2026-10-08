@@ -2,7 +2,6 @@
 
 #include "types/Particle.h"
 #include "types/Board.h"
-#include "neighbours/Grid.h"
 #include "io/StateWriter.h"
 #include "simulation/SimulationConfig.h"
 
@@ -37,11 +36,12 @@ public:
     
     bool isValidInitialPosition(const types::Vector2D& position) const;
 
-private: 
+private:
+    void updateAccelerations();
+
     SimulationConfig config;
     types::Board board;
     std::vector<types::Particle> particles;
-    neighbours::Grid grid;
     io::StateWriter writer;
     std::mt19937 rng;
     double time;
