@@ -29,8 +29,18 @@ Simulation::Simulation(SimulationConfig config)
     rng(config.seed),
     time(0.0) {}
 
+// Simula hasta finalTime y guarda el estado en t=0 y cada outputEverySteps pasos.
 void Simulation::run(std::string outputPath) {
+    initializeParticles();
+    writer.open(outputPath);
+    writer.writeStateImmediately(particles, time);
 
+    const long long steps = std::llround(config.finalTime / config.dt);
+    for (long long n = 0; n < steps; n++) {
+        step();
+        writer.writeState(particles, time);
+    }
+    writer.close();
 }
 
 // Ubica las N particulas (rechazo) y arma el estado inicial de Verlet: a(0) y r(-dt).
@@ -90,11 +100,27 @@ void Simulation::step() {
     }
     time += dt;
 
+    markUsedParticles();
     updateAccelerations();
 
     for (auto& p : particles) {
         p.setVelocity((p.getPosition() - p.getPreviousPosition()) * (1.0 / dt) +
                       p.getAcceleration() * (0.5 * dt));
+    }
+}
+
+// Fresca -> usada al primer contacto con un obstaculo. Un choque dura cientos de pasos,
+// asi que revisar la superposicion al final de cada paso no se pierde ninguno.
+void Simulation::markUsedParticles() {
+    for (auto& p : particles) {
+        if (p.getUsed()) continue;
+        for (const auto& obstacle : board.getObstacles()) {
+            const types::Vector2D center{obstacle.getX(), obstacle.getY()};
+            if ((p.getPosition() - center).norm() < p.getRadius() + obstacle.getRadius()) {
+                p.setUsed();
+                break;
+            }
+        }
     }
 }
 

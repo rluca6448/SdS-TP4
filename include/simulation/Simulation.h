@@ -39,6 +39,8 @@ public:
 private:
     void updateAccelerations();
 
+    void markUsedParticles();
+
     SimulationConfig config;
     types::Board board;
     std::vector<types::Particle> particles;

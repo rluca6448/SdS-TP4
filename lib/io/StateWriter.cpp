@@ -11,6 +11,7 @@ void StateWriter::open(std::string path) {
         throw std::runtime_error("No se pudo abrir el archivo de output: " + path);
     }
 
+    out_.precision(8);  // con 6 cifras (default) el tiempo se redondea cerca de t=30 s
     stepCounter = 0;
 }
 
