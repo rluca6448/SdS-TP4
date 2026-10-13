@@ -1,6 +1,8 @@
 #include "simulation/Simulation.h"
 
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <stdexcept>
 
 namespace simulation {
@@ -30,17 +32,60 @@ Simulation::Simulation(SimulationConfig config)
     time(0.0) {}
 
 // Simula hasta finalTime y guarda el estado en t=0 y cada outputEverySteps pasos.
+// Junto al output escribe <salida>_energia.txt con "t E" en los mismos instantes.
 void Simulation::run(std::string outputPath) {
     initializeParticles();
     writer.open(outputPath);
-    writer.writeStateImmediately(particles, time);
 
+    std::filesystem::path energyPath(outputPath);
+    energyPath.replace_extension();
+    energyPath += "_energia.txt";
+    std::ofstream energyOut(energyPath);
+    if (!energyOut) {
+        throw std::runtime_error("No se pudo abrir el archivo de energia: " + energyPath.string());
+    }
+    energyOut.precision(12);
+    energyOut << "# t E\n";
+
+    auto save = [&]() {
+        writer.writeStateImmediately(particles, time);
+        energyOut << time << " " << totalEnergy() << "\n";
+    };
+
+    save();
     const long long steps = std::llround(config.finalTime / config.dt);
     for (long long n = 0; n < steps; n++) {
         step();
-        writer.writeState(particles, time);
+        if ((n + 1) % config.outputEverySteps == 0) save();
     }
     writer.close();
+}
+
+double Simulation::totalEnergy() const {
+    const double k = config.springConstant;
+    const auto potential = [k](double xi) { return xi > 0.0 ? 0.5 * k * xi * xi : 0.0; };
+
+    double energy = 0.0;
+    for (std::size_t i = 0; i < particles.size(); i++) {
+        const types::Particle& p = particles[i];
+        const double speed = p.getVelocity().norm();
+        energy += 0.5 * p.getMass() * speed * speed;
+
+        for (std::size_t j = i + 1; j < particles.size(); j++) {
+            const double distance = (particles[j].getPosition() - p.getPosition()).norm();
+            energy += potential(p.getRadius() + particles[j].getRadius() - distance);
+        }
+        if (config.obstacles) {
+            for (const auto& obstacle : board.getObstacles()) {
+                const double distance =
+                    (types::Vector2D{obstacle.getX(), obstacle.getY()} - p.getPosition()).norm();
+                energy += potential(p.getRadius() + obstacle.getRadius() - distance);
+            }
+        }
+        // pared: xi = |r| + r - R (particula imagen, ver addWallForces)
+        energy += potential(p.getPosition().norm() + p.getRadius() - board.getRadius());
+    }
+    return energy;
 }
 
 // Ubica las N particulas (rechazo) y arma el estado inicial de Verlet: a(0) y r(-dt).
@@ -112,6 +157,7 @@ void Simulation::step() {
 // Fresca -> usada al primer contacto con un obstaculo. Un choque dura cientos de pasos,
 // asi que revisar la superposicion al final de cada paso no se pierde ninguno.
 void Simulation::markUsedParticles() {
+    if (!config.obstacles) return;
     for (auto& p : particles) {
         if (p.getUsed()) continue;
         for (const auto& obstacle : board.getObstacles()) {
@@ -153,6 +199,7 @@ void Simulation::addParticleForces(std::vector<types::Vector2D>& forces) {
 }
 
 void Simulation::addObstacleForces(std::vector<types::Vector2D>& forces) {
+    if (!config.obstacles) return;
     for (std::size_t i = 0; i < particles.size(); i++) {
         for (const auto& obstacle : board.getObstacles()) {
             forces[i] += springForce(
@@ -179,9 +226,11 @@ void Simulation::addWallForces(std::vector<types::Vector2D>& forces) {
 bool Simulation::isValidInitialPosition(const types::Vector2D& position) const {
     if (position.norm() > board.getRadius() - PARTICLE_RADIUS) return false;
 
-    for (const auto& obstacle : board.getObstacles()) {
-        const types::Vector2D center{obstacle.getX(), obstacle.getY()};
-        if ((position - center).norm() < PARTICLE_RADIUS + obstacle.getRadius()) return false;
+    if (config.obstacles) {
+        for (const auto& obstacle : board.getObstacles()) {
+            const types::Vector2D center{obstacle.getX(), obstacle.getY()};
+            if ((position - center).norm() < PARTICLE_RADIUS + obstacle.getRadius()) return false;
+        }
     }
 
     for (const auto& p : particles) {

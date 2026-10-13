@@ -11,5 +11,6 @@ struct SimulationConfig {
     int outputEverySteps = 100;
     unsigned int seed = 1;
     double initialSpeed = 1.0;
+    bool obstacles = true;  // false: sistema sin obstaculos (punto 2.1.a)
 };
 }

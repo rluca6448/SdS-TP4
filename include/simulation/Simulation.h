@@ -36,6 +36,9 @@ public:
     
     bool isValidInitialPosition(const types::Vector2D& position) const;
 
+    // Energia cinetica + potencial elastica de todos los contactos (J).
+    double totalEnergy() const;
+
 private:
     void updateAccelerations();
 
