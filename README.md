@@ -36,7 +36,7 @@ Los argumentos son opcionales. Los tres primeros son posicionales y van en ese o
 | `initialSpeed` (v0) | 1 m/s | no, editar `SimulationConfig.h` |
 | `obstacles` | con obstáculos | `--sin-obstaculos` (sistema sin obstáculos) |
 
-Con los valores por defecto (N = 100, 5 s) tarda unos 45 s. La búsqueda de pares es O(N²) por ahora.
+Con los valores por defecto (N = 100, 5 s) tarda unos 2 s. Los pares en contacto se buscan con una grilla de celdas.
 
 ## Formato de salida
 
@@ -79,8 +79,8 @@ Dibuja el billar, los obstáculos y las partículas (frescas en azul, usadas en 
 ## Elección de dt (punto 2.1.a)
 
 ```bash
-python3 scripts/energia_dt.py                                                 # 2 s, N = 300, ~2 min
-python3 scripts/energia_dt.py --tf 30 --dts 1e-4,5e-5,2e-5,1e-5 --seeds 1,2  # ~40 min
+python3 scripts/energia_dt.py                                                 # 2 s, N = 300, unos segundos
+python3 scripts/energia_dt.py --tf 30 --dts 1e-4,5e-5,2e-5,1e-5 --seeds 1,2  # unos minutos
 python3 scripts/energia_dt.py --reusar                                        # solo vuelve a analizar
 ```
 
@@ -98,7 +98,7 @@ include/ y lib/
   types/                      Vector2D, Particle, Obstacle, Board
   simulation/                 Simulation (motor) y SimulationConfig
   io/                         StateWriter (escribe el output)
-  neighbours/                 Grid (todavía no se compila ni se usa)
+  neighbours/                 Grid (grilla de celdas para buscar pares en contacto)
 ```
 
 ## Cómo funciona
@@ -111,5 +111,5 @@ include/ y lib/
 
 ## Estado
 
-- **Hecho:** ubicación inicial sin solapamiento, fuerzas de contacto (partículas, obstáculos y pared), integración con Verlet, conversión fresca → usada, salida a archivo y visor.
-- **Pendiente:** energía total para elegir `dt` (2.1.a), grilla de vecinos y tiempos de ejecución (2.1.b), análisis de `t90` y obstáculos (2.2 y 2.4), distribución de velocidades (2.3) y animación para la entrega.
+- **Hecho:** ubicación inicial sin solapamiento (al azar, y en red hexagonal con ruido para N > ~440), fuerzas de contacto (partículas, obstáculos y pared), integración con Verlet, grilla de vecinos, conversión fresca → usada, salida a archivo y de energía, visor, y elección de `dt` (punto 2.1.a).
+- **Pendiente:** tiempos de ejecución vs N (2.1.b), análisis de `t90` y obstáculos (2.2 y 2.4), distribución de velocidades (2.3) y animación para la entrega.

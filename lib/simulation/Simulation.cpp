@@ -1,5 +1,6 @@
 #include "simulation/Simulation.h"
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -27,6 +28,7 @@ types::Vector2D springForce(const types::Vector2D& ri, const types::Vector2D& rj
 Simulation::Simulation(SimulationConfig config)
     : config(config),
     board(0.51, config.x0, PARTICLE_RADIUS),
+    grid(0.51, 2.0 * PARTICLE_RADIUS),
     writer(config.outputEverySteps),
     rng(config.seed),
     time(0.0) {}
@@ -88,7 +90,9 @@ double Simulation::totalEnergy() const {
     return energy;
 }
 
-// Ubica las N particulas (rechazo) y arma el estado inicial de Verlet: a(0) y r(-dt).
+// Ubica las N particulas y arma el estado inicial de Verlet: a(0) y r(-dt).
+// Primero por rechazo (posiciones uniformes al azar); si el sorteo se satura (hacia el 55%
+// del area cubierta) las ubica en una red hexagonal con ruido (placeOnLattice).
 void Simulation::initializeParticles() {
     const double twoPi = 2.0 * std::acos(-1.0);
     const double maxRadius = board.getRadius() - PARTICLE_RADIUS;
@@ -98,7 +102,8 @@ void Simulation::initializeParticles() {
     particles.clear();
     particles.reserve(config.particleCount);
 
-    for (int id = 0; id < config.particleCount; id++) {
+    bool saturated = false;
+    for (int id = 0; id < config.particleCount && !saturated; id++) {
         types::Vector2D position;
         bool placed = false;
         for (int attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS && !placed; attempt++) {
@@ -109,8 +114,8 @@ void Simulation::initializeParticles() {
             placed = isValidInitialPosition(position);
         }
         if (!placed) {
-            throw std::runtime_error("No se pudo ubicar la particula " + std::to_string(id) +
-                                     " sin solapamientos");
+            saturated = true;
+            break;
         }
 
         const double theta = twoPi * unit(rng);
@@ -118,6 +123,7 @@ void Simulation::initializeParticles() {
                                        config.initialSpeed * std::sin(theta)};
         particles.emplace_back(id, position, velocity, PARTICLE_MASS, PARTICLE_RADIUS);
     }
+    if (saturated) placeOnLattice();
 
     updateAccelerations();
 
@@ -127,6 +133,74 @@ void Simulation::initializeParticles() {
         p.setPreviousPosition(p.getPosition() - p.getVelocity() * dt +
                               p.getAcceleration() * (0.5 * dt * dt));
     }
+}
+
+// Red hexagonal con ruido para densidades altas: busca el mayor espaciado d (>= 2r) cuya red
+// tiene al menos N sitios dentro del dominio, sortea N sitios y desplaza cada particula una
+// distancia <= (d - 2r)/2 en una direccion al azar. Dos vecinas quedan a >= 2r: sin solapamiento.
+void Simulation::placeOnLattice() {
+    const double twoPi = 2.0 * std::acos(-1.0);
+    const double r = PARTICLE_RADIUS;
+    const double wallLimit = board.getRadius() - r;
+    const std::size_t needed = static_cast<std::size_t>(config.particleCount);
+    std::uniform_real_distribution<double> unit(0.0, 1.0);
+
+    const double offsetX = unit(rng);
+    const double offsetY = unit(rng);
+
+    std::vector<types::Vector2D> sites;
+    double slack = 0.0;  // desplazamiento maximo permitido, (d - 2r)/2
+    bool found = false;
+    constexpr int SPACING_STEPS = 1000;
+    for (int k = 0; k <= SPACING_STEPS && !found; k++) {
+        const double d = 4.0 * r - 2.0 * r * k / SPACING_STEPS;  // de 4r a 2r (en contacto)
+        slack = (d - 2.0 * r) / 2.0;
+        const double rowHeight = d * std::sqrt(3.0) / 2.0;
+
+        sites.clear();
+        for (int row = 0;; row++) {
+            const double y = -wallLimit + (offsetY + row) * rowHeight;
+            if (y > wallLimit) break;
+            for (int col = 0;; col++) {
+                const double x = -wallLimit + (offsetX + 0.5 * (row % 2) + col) * d;
+                if (x > wallLimit) break;
+                const types::Vector2D site{x, y};
+                if (!isValidLatticeSite(site, slack)) continue;
+                sites.push_back(site);
+            }
+        }
+        found = sites.size() >= needed;
+    }
+    if (!found) {
+        throw std::runtime_error("No se pudieron ubicar " + std::to_string(needed) +
+                                 " particulas: no entran ni en una red hexagonal compacta");
+    }
+
+    std::shuffle(sites.begin(), sites.end(), rng);
+    particles.clear();
+    for (std::size_t id = 0; id < needed; id++) {
+        const double rho = slack * std::sqrt(unit(rng));
+        const double phi = twoPi * unit(rng);
+        const types::Vector2D position = sites[id] + types::Vector2D{rho * std::cos(phi), rho * std::sin(phi)};
+
+        const double theta = twoPi * unit(rng);
+        const types::Vector2D velocity{config.initialSpeed * std::cos(theta),
+                                       config.initialSpeed * std::sin(theta)};
+        particles.emplace_back(static_cast<int>(id), position, velocity, PARTICLE_MASS, PARTICLE_RADIUS);
+    }
+}
+
+// Un sitio sirve si, aun con el desplazamiento maximo, la particula queda dentro de la pared
+// y sin solapar los obstaculos.
+bool Simulation::isValidLatticeSite(const types::Vector2D& site, double slack) const {
+    if (site.norm() > board.getRadius() - PARTICLE_RADIUS - slack) return false;
+    if (config.obstacles) {
+        for (const auto& obstacle : board.getObstacles()) {
+            const types::Vector2D center{obstacle.getX(), obstacle.getY()};
+            if ((site - center).norm() < PARTICLE_RADIUS + obstacle.getRadius() + slack) return false;
+        }
+    }
+    return true;
 }
 
 // Verlet: r(t+dt) = 2 r(t) - r(t-dt) + a(t) dt^2.
@@ -185,17 +259,17 @@ std::vector<types::Vector2D> Simulation::computeForces() {
     return forces;
 }
 
-// ponytail: todos contra todos, O(N^2). Reemplazar por neighbours::Grid en 2.1.b.
+// Solo se evaluan los pares de celdas contiguas de la grilla: dos particulas en contacto
+// (distancia < 2r) siempre estan en la misma celda o en celdas contiguas.
 void Simulation::addParticleForces(std::vector<types::Vector2D>& forces) {
-    for (std::size_t i = 0; i < particles.size(); i++) {
-        for (std::size_t j = i + 1; j < particles.size(); j++) {
-            const types::Vector2D f = springForce(
-                particles[i].getPosition(), particles[j].getPosition(),
-                particles[i].getRadius() + particles[j].getRadius(), config.springConstant);
-            forces[i] += f;
-            forces[j] += f * -1.0;  // tercera ley de Newton
-        }
-    }
+    grid.rebuild(particles);
+    grid.forEachPair([&](int i, int j) {
+        const types::Vector2D f = springForce(
+            particles[i].getPosition(), particles[j].getPosition(),
+            particles[i].getRadius() + particles[j].getRadius(), config.springConstant);
+        forces[i] += f;
+        forces[j] += f * -1.0;  // tercera ley de Newton
+    });
 }
 
 void Simulation::addObstacleForces(std::vector<types::Vector2D>& forces) {

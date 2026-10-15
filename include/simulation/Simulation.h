@@ -2,6 +2,7 @@
 
 #include "types/Particle.h"
 #include "types/Board.h"
+#include "neighbours/Grid.h"
 #include "io/StateWriter.h"
 #include "simulation/SimulationConfig.h"
 
@@ -40,6 +41,10 @@ public:
     double totalEnergy() const;
 
 private:
+    void placeOnLattice();
+
+    bool isValidLatticeSite(const types::Vector2D& site, double slack) const;
+
     void updateAccelerations();
 
     void markUsedParticles();
@@ -47,6 +52,7 @@ private:
     SimulationConfig config;
     types::Board board;
     std::vector<types::Particle> particles;
+    neighbours::Grid grid;
     io::StateWriter writer;
     std::mt19937 rng;
     double time;

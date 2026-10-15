@@ -1,35 +1,37 @@
 #include "neighbours/Grid.h"
 
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+
 namespace neighbours {
 
-Grid::Grid(double radius, double cellSize)
-    : radius(radius), cellSize(cellSize) {}
+Grid::Grid(double halfWidth, double minCellSize) : halfWidth(halfWidth) {
+    if (halfWidth <= 0.0 || minCellSize <= 0.0) {
+        throw std::invalid_argument("Grid: halfWidth y minCellSize deben ser positivos");
+    }
+    // Cantidad entera de celdas con lado >= minCellSize
+    cellsPerSide = std::max(1, static_cast<int>(std::floor(2.0 * halfWidth / minCellSize)));
+    cellSize = 2.0 * halfWidth / cellsPerSide;
+    head.assign(static_cast<std::size_t>(cellsPerSide) * cellsPerSide, -1);
+}
 
-void Grid::rebuild(std::vector<types::Particle>& particles) {
-    for (auto& cell : grid_) cell.clear();
-    for (auto& p : particles) {
-        int cx = cellIndexX(p.getXLocation());
-        int cy = cellIndexY(p.getYLocation());
-        p.setCellXIndex(cx);
-        p.setCellYIndex(cy);
-        grid_[flatIndex(cx, cy)].push_back(&p);
+int Grid::cellIndex(double coordinate) const {
+    const int index = static_cast<int>(std::floor((coordinate + halfWidth) / cellSize));
+    return std::clamp(index, 0, cellsPerSide - 1);  // una particula en el borde cae en la ultima celda
+}
+
+void Grid::rebuild(const std::vector<types::Particle>& particles) {
+    std::fill(head.begin(), head.end(), -1);
+    next.assign(particles.size(), -1);
+
+    for (std::size_t i = 0; i < particles.size(); i++) {
+        const types::Vector2D position = particles[i].getPosition();
+        const std::size_t cell =
+            static_cast<std::size_t>(cellIndex(position.y)) * cellsPerSide + cellIndex(position.x);
+        next[i] = head[cell];
+        head[cell] = static_cast<int>(i);
     }
 }
 
-std::vector<types::Particle*> Grid::neighboursOf(const types::Particle& p) const {
-    std::vector<types::Particle*> result;
-    int cx = p.getCellXIndex();
-    int cy = p.getCellYIndex();
-    for (int dx = -1; dx <= 1; dx++) {
-        for (int dy = -1; dy <= 1; dy++) {
-            int nx = cx + dx, ny = cy + dy;
-            if (nx < 0 || nx >= cellsX_ || ny < 0 || ny >= cellsY_) continue;
-            for (auto* other : grid_[flatIndex(nx, ny)]) {
-                if (other->getId() != p.getId()) result.push_back(other);
-            }
-        }
-    }
-    return result;
 }
-
-} 
