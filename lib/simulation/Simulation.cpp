@@ -31,10 +31,19 @@ Simulation::Simulation(SimulationConfig config)
     grid(0.51, 2.0 * PARTICLE_RADIUS),
     writer(config.outputEverySteps),
     rng(config.seed),
-    time(0.0) {}
+    time(0.0) {
+    // Los obstaculos van desde en contacto entre si (x0 = r) hasta en contacto con la pared (x0 = R - r)
+    constexpr double TOLERANCE = 1e-9;
+    if (config.obstacles && (config.x0 < PARTICLE_RADIUS - TOLERANCE ||
+                             config.x0 > board.getRadius() - PARTICLE_RADIUS + TOLERANCE)) {
+        throw std::invalid_argument("x0 debe estar entre " + std::to_string(PARTICLE_RADIUS) + " y " +
+                                    std::to_string(board.getRadius() - PARTICLE_RADIUS));
+    }
+}
 
 // Simula hasta finalTime y guarda el estado en t=0 y cada outputEverySteps pasos.
-// Junto al output escribe <salida>_energia.txt con "t E" en los mismos instantes.
+// Junto al output escribe, en los mismos instantes, <salida>_energia.txt con "t E" y
+// <salida>_usadas.txt con "t N_usadas" (alcanza para F_u(t) y t90 sin guardar el estado).
 void Simulation::run(std::string outputPath) {
     initializeParticles();
     writer.open(outputPath);
@@ -49,9 +58,21 @@ void Simulation::run(std::string outputPath) {
     energyOut.precision(12);
     energyOut << "# t E\n";
 
+    std::filesystem::path usedPath(outputPath);
+    usedPath.replace_extension();
+    usedPath += "_usadas.txt";
+    std::ofstream usedOut(usedPath);
+    if (!usedOut) {
+        throw std::runtime_error("No se pudo abrir el archivo de usadas: " + usedPath.string());
+    }
+    usedOut.precision(12);
+    usedOut << "# t N_usadas\n";
+
     auto save = [&]() {
         writer.writeStateImmediately(particles, time);
         energyOut << time << " " << totalEnergy() << "\n";
+        usedOut << time << " " << std::count_if(particles.begin(), particles.end(),
+                                                [](const types::Particle& p) { return p.getUsed(); }) << "\n";
     };
 
     save();

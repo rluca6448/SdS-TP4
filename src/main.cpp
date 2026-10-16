@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-// Uso: tp4 [N] [tiempo_final] [archivo_salida] [--dt X] [--every N] [--seed S] [--sin-obstaculos]
+// Uso: tp4 [N] [tiempo_final] [archivo_salida] [--dt X] [--every N] [--seed S] [--x0 X] [--sin-obstaculos]
 int main(int argc, char* argv[]) {
     try {
         simulation::SimulationConfig config;
@@ -17,10 +17,11 @@ int main(int argc, char* argv[]) {
             const std::string arg = argv[i];
             if (arg == "--sin-obstaculos") {
                 config.obstacles = false;
-            } else if (arg == "--dt" || arg == "--every" || arg == "--seed") {
+            } else if (arg == "--dt" || arg == "--every" || arg == "--seed" || arg == "--x0") {
                 if (i + 1 >= argc) throw std::invalid_argument("falta el valor de " + arg);
                 const std::string value = argv[++i];
                 if (arg == "--dt") config.dt = std::stod(value);
+                else if (arg == "--x0") config.x0 = std::stod(value);
                 else if (arg == "--every") config.outputEverySteps = std::stoi(value);
                 else config.seed = static_cast<unsigned int>(std::stoul(value));
             } else if (arg.rfind("--", 0) == 0) {
