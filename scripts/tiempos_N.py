@@ -11,7 +11,7 @@ Uso (desde la raíz del repo, con el proyecto compilado):
 
 Con --jobs > 1 hay corridas simultáneas y los tiempos se ven afectados: para medir, usar --jobs 1.
 El estado de las partículas se descarta (va a /dev/null); el formateo de la salida sí se mide.
-Resultados en build/tiempos_N/ (tiempos_N.csv y tiempos_N.png).
+Datos en build/tiempos_N/ (tiempos_N.csv); figura en build/graficos/2_1_b/tiempos_N.png.
 """
 import argparse
 import csv
@@ -39,6 +39,7 @@ p.add_argument("--every", type=int, default=100, help="cada cuántos pasos se gu
 p.add_argument("--jobs", type=int, default=1, help="corridas simultáneas (1 para medir tiempos)")
 p.add_argument("--bin", default=str(RAIZ / "build" / "tp4"))
 p.add_argument("--out", default=str(RAIZ / "build" / "tiempos_N"))
+p.add_argument("--graficos", default=str(RAIZ / "build" / "graficos" / "2_1_b"), help="carpeta de las figuras")
 p.add_argument("--tp3", help="CSV del TP3 con columnas N,promedio,desvio (s)")
 p.add_argument("--reusar", action="store_true", help="no correr: usar tiempos_N.csv existente")
 args = p.parse_args()
@@ -48,6 +49,8 @@ if args.reps < 1 or args.tf <= 0 or args.dt <= 0 or any(n < 1 for n in ns):
     p.error("--reps, --tf, --dt y --ns deben ser positivos")
 out = Path(args.out)
 out.mkdir(parents=True, exist_ok=True)
+graf = Path(args.graficos)
+graf.mkdir(parents=True, exist_ok=True)
 csv_path = out / "tiempos_N.csv"
 
 
@@ -107,16 +110,16 @@ if len(Ns) >= 2:
 
 fig, ax = plt.subplots(figsize=(7, 4.8))
 ax.errorbar(Ns, medias, yerr=desvios, fmt="o-", capsize=4,
-            label="TP4 (paso temporal, Verlet + grilla)" + (f", pendiente {pendiente:.2f}" if pendiente else ""))
+            label="TP4")
 if args.tp3:
     t3 = np.loadtxt(args.tp3, delimiter=",", skiprows=1, ndmin=2)
     ax.errorbar(t3[:, 0], t3[:, 1], yerr=t3[:, 2] if t3.shape[1] > 2 else None, fmt="s--", capsize=4,
-                label="TP3 (dinámica por eventos)")
-ax.set(xlabel="N (cantidad de partículas)", ylabel=f"tiempo de ejecución para {args.tf:g} s simulados (s)",
+                label="TP3")
+ax.set(xlabel="N", ylabel="tiempo de ejecución (s)",
        xscale="log", yscale="log")
 ax.grid(True, which="both", alpha=0.3)
 ax.legend()
 plt.tight_layout()
-png = out / "tiempos_N.png"
+png = graf / "tiempos_N.png"
 plt.savefig(png, dpi=110)
 print(f"\nFigura: {png}\nDatos: {csv_path}")

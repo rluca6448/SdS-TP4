@@ -10,7 +10,7 @@ Uso (desde la raíz del repo, con el proyecto compilado):
     python3 scripts/obstaculos_x0.py --n 20                   # comparación con densidad menor
     python3 scripts/obstaculos_x0.py --reusar --n 100         # solo vuelve a analizar
 
-Resultados en build/resultados/2_2_N<N>/: t90.csv, resumen.txt, fu_vs_t.png y t90_vs_x0.png.
+Datos en build/resultados/2_2_N<N>/ (t90.csv, resumen.txt); figuras en build/graficos/2_2/N<N>/ (fu_vs_t.png y t90_vs_x0.png).
 Si alguna realización no llega a F_u = 0.9 antes de t_max se informa, y se grafica como una cruz roja.
 """
 import argparse
@@ -42,6 +42,7 @@ p.add_argument("--dt", type=float, default=1e-5)
 p.add_argument("--jobs", type=int, default=os.cpu_count() or 1, help="corridas en paralelo")
 p.add_argument("--bin", default=str(RAIZ / "build" / "tp4"))
 p.add_argument("--out", help="carpeta de salida (por defecto build/resultados/2_2_N<N>)")
+p.add_argument("--graficos", help="carpeta de las figuras (por defecto build/graficos/2_2/N<N>)")
 p.add_argument("--reusar", action="store_true", help="no correr: usar los archivos que ya existen")
 args = p.parse_args()
 
@@ -53,6 +54,8 @@ if any(x < r - 1e-9 or x > R - r + 1e-9 for x in x0s):
     p.error(f"x0 debe estar entre {r} y {R - r}")
 out = Path(args.out) if args.out else RAIZ / "build" / "resultados" / f"2_2_N{args.n}"
 out.mkdir(parents=True, exist_ok=True)
+graf = Path(args.graficos) if args.graficos else RAIZ / "build" / "graficos" / "2_2" / f"N{args.n}"
+graf.mkdir(parents=True, exist_ok=True)
 semillas = list(range(1, args.reps + 1))
 
 
@@ -131,15 +134,14 @@ for x0 in tipicos:
     t = curvas[(x0, semillas[0])][0]
     fus = np.array([curvas[(x0, s)][1] for s in semillas])
     m, d = fus.mean(axis=0), fus.std(axis=0, ddof=1) if len(semillas) > 1 else np.zeros_like(fus[0])
-    linea, = ax.plot(t, m, label=f"x0 = {x0:.3f} m" + ("  (mejor)" if validos and x0 == mejor else ""))
+    linea, = ax.plot(t, m, label=f"{x0:.2f}")
     ax.fill_between(t, np.clip(m - d, 0, 1), np.clip(m + d, 0, 1), alpha=0.2, color=linea.get_color())
 ax.axhline(args.umbral, color="gray", ls=":", lw=1)
-ax.set(xlabel="t (s)", ylabel="F_u(t) = N_usadas / N", ylim=(0, 1.02), xlim=(0, args.tf),
-       title=f"N = {args.n} (promedio de {args.reps} realizaciones ± desvío)")
-ax.legend()
+ax.set(xlabel="t (s)", ylabel=r"$F_u$", ylim=(0, 1.02), xlim=(0, args.tf))
+ax.legend(title=r"$x_0$ (m)")
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig(out / "fu_vs_t.png", dpi=110)
+plt.savefig(graf / "fu_vs_t.png", dpi=110)
 plt.close(fig)
 
 # <t90> vs x0, con los puntos individuales y las realizaciones que no llegaron al umbral
@@ -153,12 +155,12 @@ for x0 in x0s:
             ax.plot(x0, v, ".", color="gray", alpha=0.6)
 ok = [x0 for x0 in x0s if alcanzaron[x0] > 0]
 ax.errorbar(ok, [media[x] for x in ok], yerr=[desvio[x] for x in ok], fmt="o-", capsize=4,
-            label=f"<{etiqueta}> ± desvío (solo las que alcanzan)")
-ax.plot([], [], "x", color="red", label=f"no alcanzó F_u = {args.umbral:g} antes de t_max")
-ax.plot([], [], ".", color="gray", label="realizaciones individuales")
-ax.set(xlabel="x0 (m)", ylabel=f"{etiqueta} (s)", title=f"N = {args.n}, {args.reps} realizaciones por x0")
-ax.legend(fontsize=8)
+            label=rf"$\langle t_{{{etiqueta[1:]}}}\rangle$")
+ax.plot([], [], "x", color="red", label="no llegan")
+ax.plot([], [], ".", color="gray", label="realizaciones")
+ax.set(xlabel=r"$x_0$ (m)", ylabel=rf"$\langle t_{{{etiqueta[1:]}}}\rangle$ (s)")
+ax.legend(fontsize=9)
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
-plt.savefig(out / "t90_vs_x0.png", dpi=110)
-print(f"\nFiguras y datos en {out}")
+plt.savefig(graf / "t90_vs_x0.png", dpi=110)
+print(f"\nDatos en {out}\nFiguras en {graf}")

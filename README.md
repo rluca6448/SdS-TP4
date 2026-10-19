@@ -84,9 +84,23 @@ python3 scripts/energia_dt.py --tf 30 --dts 1e-4,5e-5,2e-5,1e-5 --seeds 1,2  # u
 python3 scripts/energia_dt.py --reusar                                        # solo vuelve a analizar
 ```
 
-Corre `build/tp4 --sin-obstaculos` para cada dt (y semilla), en paralelo, y calcula el observable `max |E(t) − E0| / E0`. Imprime una tabla y guarda `build/energia_dt/energia_dt.png`, con la energía en el tiempo por dt y el observable en función de dt. Requiere el proyecto compilado. Opciones: `--tf`, `--n`, `--dts`, `--seeds`, `--muestreo` (cada cuántos segundos se guarda la energía, 1 ms por defecto), `--jobs` y `--out`.
+Corre `build/tp4 --sin-obstaculos` para cada dt (y semilla), en paralelo, y calcula el observable `max |E(t) − E0| / E0`. Imprime una tabla y guarda las figuras en `build/graficos/2_1_a/`: la energía total en el tiempo, su desviación por dt y el observable en función de dt. Requiere el proyecto compilado. Opciones: `--tf`, `--n`, `--dts`, `--seeds`, `--muestreo` (cada cuántos segundos se guarda la energía, 1 ms por defecto), `--jobs` y `--out`.
 
 Con los resultados del grupo (N = 300, 30 s, dos semillas), dt = 1e-5 s conserva la energía con un error máximo de 1e-5 a 2e-5.
+
+## Dónde quedan los resultados
+
+Los datos (CSV y TXT) quedan en `build/resultados/`, y las figuras y animaciones en `build/graficos/`, con una carpeta por punto:
+
+```
+build/graficos/
+  sistema1/   trayectorias y ECM vs dt
+  2_1_a/      energía total y su desviación vs dt, GIF sin obstáculos
+  2_1_b/      tiempo de ejecución vs N, ubicación inicial, GIF de N = 100 a 700
+  2_2/        N100/ y N20/ (F_u(t) y t90 vs x0) y gifs/ (una animación por x0)
+  2_4_a/      t90 y t100 vs densidad (complementos/: corridas de 30 s y de validación)
+  otros/      imágenes de pruebas anteriores
+```
 
 ## Estructura
 
