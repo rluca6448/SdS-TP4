@@ -151,7 +151,6 @@ for idx, color, nombre, marca in ((1, "tab:blue", "t_{90}", "o"), (4, "tab:red",
     huecos = [n for n in ok if est[n][idx - 1] < args.reps]
     ax.plot([n / AREA for n in llenos], [est[n][idx] for n in llenos], marca, color=color)
     ax.plot([n / AREA for n in huecos], [est[n][idx] for n in huecos], marca, color=color, mfc="white")
-ax.plot([], [], "o", color="gray", mfc="white", label="no llegan todas")
 ax.set(xscale="log", xlabel=r"$\rho$ (partículas/m$^2$)", ylabel=r"$\langle t\rangle$ (s)")
 ax.legend(fontsize=9, loc="upper left")
 marcas = [m for m in (10, 20, 50, 100, 200, 500) if min(ns) / AREA / 1.5 <= m <= max(ns) / AREA * 1.5]
@@ -170,7 +169,7 @@ for n, c in zip(ns, colores):
     t = curvas[(n, semillas[0])][0]
     ax.plot(t, np.mean([curvas[(n, s)][1] for s in semillas], axis=0), color=c, label=f"{n / AREA:.0f}")
 ax.axhline(0.9, color="gray", ls=":", lw=1)
-ax.set(xlabel="t (s)", ylabel=r"$F_u$", ylim=(0, 1.02), xlim=(0, args.tf))
+ax.set(xlabel="t (s)", ylabel="fracción de usadas", ylim=(0, 1.02), xlim=(0, args.tf))
 ax.legend(title=r"$\rho$ (partículas/m$^2$)", fontsize=7, title_fontsize=8, ncol=2)
 ax.grid(True, alpha=0.3)
 plt.tight_layout()

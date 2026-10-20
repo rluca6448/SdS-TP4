@@ -25,6 +25,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 RAIZ = Path(__file__).resolve().parent.parent
+DT_CANONICOS = (1e-3, 5e-4, 2e-4, 1e-4, 5e-5, 2e-5, 1e-5, 5e-6, 2e-6, 1e-6)
+
+
+def color_dt(dt):
+    """Un color fijo por cada dt, igual en todos los paneles y figuras."""
+    for i, c in enumerate(DT_CANONICOS):
+        if abs(np.log10(dt / c)) < 0.02:
+            return plt.cm.tab10(i)
+    return plt.cm.tab10(len(DT_CANONICOS) % 10)
+
 CHOQUE = 3.5e-3  # duración típica de un choque entre dos partículas (s)
 
 p = argparse.ArgumentParser()
@@ -108,40 +118,34 @@ for dt in sorted(dts, reverse=True):
 fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
 for dt in sorted(dts, reverse=True):
     t, E = datos[(dt, seeds[0])]
-    ax[0].semilogy(t, np.maximum(np.abs(E - E[0]) / E[0], 1e-12), lw=0.9, label=f"{dt:g}")
+    ax[0].semilogy(t, np.maximum(np.abs(E - E[0]) / E[0], 1e-12), lw=0.9, color=color_dt(dt), label=f"{dt:g}")
 ax[0].set(xlabel="t (s)", ylabel=r"$|E(t)-E_0|\,/\,E_0$")
 ax[0].legend(title="dt (s)", fontsize=7, title_fontsize=8, ncol=2)
 ax[0].grid(True, alpha=0.3)
 for s, marcador in zip(seeds, "osd^v"):
     xs = sorted(dts)
-    ax[1].loglog(xs, [maximos[(dt, s)] for dt in xs], marcador + "-", label=f"{s}")
+    ax[1].loglog(xs, [maximos[(dt, s)] for dt in xs], marcador + "-", color="tab:blue", alpha=0.7)
 ax[1].set(xlabel="dt (s)", ylabel=r"$\max\,|E-E_0|\,/\,E_0$")
-ax[1].legend(title="semilla")
 ax[1].grid(True, which="both", alpha=0.3)
 plt.tight_layout()
 png = graf / f"energia_dt{args.sufijo}.png"
 plt.savefig(png, dpi=110)
 plt.close(fig)
 
-# Energía total E(t) (no solo su desviación): a la izquierda los dt grandes, a la derecha un zoom con los chicos.
-# Los dt para los que la energía diverge (más de 2 veces E0) no se dibujan.
+# Energía total E(t) solo para el dt elegido (1e-5) y sus dos vecinos de la lista.
 E0 = datos[(dts[0], seeds[0])][1][0]
-fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
-divergen = [dt for dt in dts if maximos[(dt, seeds[0])] > 1]
-for dt in sorted((d for d in dts if d not in divergen), reverse=True):
+elegido = min(dts, key=lambda d: abs(np.log10(d / 1e-5)))
+orden = sorted(dts)
+i = orden.index(elegido)
+vecinos = orden[max(i - 1, 0):i + 2]
+fig, ax = plt.subplots(figsize=(7, 4.5))
+for dt in sorted(vecinos, reverse=True):
     t, E = datos[(dt, seeds[0])]
-    if dt >= 1e-4:
-        ax[0].plot(t, E, lw=0.9, label=f"{dt:g}")
-    if dt <= 1e-4:
-        ax[1].plot(t, E, lw=0.9, label=f"{dt:g}")
-for a in ax:
-    a.axhline(E0, color="k", ls=":", lw=1)
-    a.set(xlabel="t (s)", ylabel="E (J)")
-    a.legend(title="dt (s)", fontsize=8, title_fontsize=8)
-    a.grid(True, alpha=0.3)
-ax[1].set_ylim(E0 * 0.995, E0 * 1.005)
-if divergen:
-    print("En E(t) no se dibuja (la energía diverge): dt = " + ", ".join(f"{d:g}" for d in sorted(divergen, reverse=True)))
+    ax.plot(t, E, lw=0.9, color=color_dt(dt), label=f"{dt:g}")
+ax.axhline(E0, color="k", ls=":", lw=1)
+ax.set(xlabel="t (s)", ylabel="E (J)")
+ax.legend(title="dt (s)", fontsize=8, title_fontsize=8)
+ax.grid(True, alpha=0.3)
 plt.tight_layout()
 png_total = graf / f"energia_total_vs_t{args.sufijo}.png"
 plt.savefig(png_total, dpi=110)

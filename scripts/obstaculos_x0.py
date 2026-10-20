@@ -137,7 +137,7 @@ for x0 in tipicos:
     linea, = ax.plot(t, m, label=f"{x0:.2f}")
     ax.fill_between(t, np.clip(m - d, 0, 1), np.clip(m + d, 0, 1), alpha=0.2, color=linea.get_color())
 ax.axhline(args.umbral, color="gray", ls=":", lw=1)
-ax.set(xlabel="t (s)", ylabel=r"$F_u$", ylim=(0, 1.02), xlim=(0, args.tf))
+ax.set(xlabel="t (s)", ylabel="fracción de usadas", ylim=(0, 1.02), xlim=(0, args.tf))
 ax.legend(title=r"$x_0$ (m)")
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
