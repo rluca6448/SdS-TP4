@@ -5,7 +5,7 @@ max_t |E(t) - E0| / E0. Guarda E(t) por dt y el observable vs dt.
 
 Uso (desde la raíz del repo, con el proyecto compilado):
     python3 scripts/energia_dt.py                       # 2 s, N = 300, 1 semilla
-    python3 scripts/energia_dt.py --tf 30 --dts 1e-4,5e-5,2e-5,1e-5 --seeds 1,2
+    python3 scripts/energia_dt.py --tf 30 --dts 1e-2,5e-3,1e-3,1e-4,1e-5 --seeds 1,2
     python3 scripts/energia_dt.py --reusar              # solo analiza corridas ya hechas
 
 Datos en build/energia_dt/ (o --out); figuras en build/graficos/2_1_a/ (energia_dt.png y energia_total_vs_t.png). El estado de las partículas se descarta
@@ -23,6 +23,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import LogFormatterMathtext
 
 RAIZ = Path(__file__).resolve().parent.parent
 DT_CANONICOS = (1e-3, 5e-4, 2e-4, 1e-4, 5e-5, 2e-5, 1e-5, 5e-6, 2e-6, 1e-6)
@@ -40,7 +41,8 @@ CHOQUE = 3.5e-3  # duración típica de un choque entre dos partículas (s)
 p = argparse.ArgumentParser()
 p.add_argument("--tf", type=float, default=2.0, help="tiempo simulado (s)")
 p.add_argument("--n", type=int, default=300, help="cantidad de partículas")
-p.add_argument("--dts", default="1e-3,5e-4,2e-4,1e-4,5e-5,2e-5,1e-5", help="lista de dt separada por comas")
+p.add_argument("--dts", default="1e-2,5e-3,1e-3,1e-4,1e-5",
+               help="lista de dt separada por comas (por defecto, una década por curva y 5e-3 intermedio)")
 p.add_argument("--seeds", default="1", help="lista de semillas separada por comas")
 p.add_argument("--muestreo", type=float, default=1e-3, help="cada cuántos segundos se guarda la energía")
 p.add_argument("--bin", default=str(RAIZ / "build" / "tp4"), help="ejecutable")
@@ -60,8 +62,16 @@ if any(dt <= 0 for dt in dts) or args.tf <= 0 or args.n < 1:
     p.error("dt, --tf y --n deben ser positivos")
 out = Path(args.out)
 out.mkdir(parents=True, exist_ok=True)
-graf = Path(args.graficos)
-graf.mkdir(parents=True, exist_ok=True)
+
+
+def potencia_de_diez(valor, matematico=False):
+    """Escribe 10^-n (o ax10^-n) en lugar de la notación 1e-n."""
+    exponente = int(np.floor(np.log10(abs(valor))))
+    mantisa = valor / 10 ** exponente
+    por_diez = "" if np.isclose(mantisa, 1.0) else f"{mantisa:g}" + (r"\times" if matematico else " × ")
+    if matematico:
+        return rf"${por_diez}10^{{{exponente}}}$"
+    return f"{por_diez}10^{exponente}"
 
 
 def archivo(dt, seed):
@@ -113,7 +123,7 @@ for dt in sorted(dts, reverse=True):
         maximos[(dt, s)] = np.abs(dev).max()
         fila.append(maximos[(dt, s)])
         finales.append(dev[-1])
-    print(f"{dt:8.0e} {CHOQUE / dt:12.0f}" + "".join(f"{m:18.3e}" for m in fila) + "".join(f"{x:19.3e}" for x in finales))
+    print(f"{potencia_de_diez(dt):>8} {CHOQUE / dt:12.0f}" + "".join(f"{m:18.3e}" for m in fila) + "".join(f"{x:19.3e}" for x in finales))
 
 fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
 for dt in sorted(dts, reverse=True):
@@ -121,11 +131,14 @@ for dt in sorted(dts, reverse=True):
     ax[0].semilogy(t, np.maximum(np.abs(E - E[0]) / E[0], 1e-12), lw=0.9, color=color_dt(dt), label=f"{dt:g}")
 ax[0].set(xlabel="t (s)", ylabel=r"$|E(t)-E_0|\,/\,E_0$")
 ax[0].legend(title="dt (s)", fontsize=7, title_fontsize=8, ncol=2)
+ax[0].yaxis.set_major_formatter(LogFormatterMathtext())
 ax[0].grid(True, alpha=0.3)
 for s, marcador in zip(seeds, "osd^v"):
     xs = sorted(dts)
     ax[1].loglog(xs, [maximos[(dt, s)] for dt in xs], marcador + "-", color="tab:blue", alpha=0.7)
 ax[1].set(xlabel="dt (s)", ylabel=r"$\max\,|E-E_0|\,/\,E_0$")
+ax[1].xaxis.set_major_formatter(LogFormatterMathtext())
+ax[1].yaxis.set_major_formatter(LogFormatterMathtext())
 ax[1].grid(True, which="both", alpha=0.3)
 plt.tight_layout()
 png = graf / f"energia_dt{args.sufijo}.png"

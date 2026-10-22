@@ -121,12 +121,31 @@ build/graficos/
   2_4_a/      t90 y t100 vs densidad y F_u(t) (complementos/: corridas de 30 s y de validación)
   otros/      imágenes de pruebas anteriores
 ```
+python3 scripts/energia_dt.py                                                 # 2 s, N = 300, unos segundos
+python3 scripts/energia_dt.py --tf 30 --dts 1e-2,5e-3,1e-3,1e-4,1e-5 --seeds 1,2  # unos minutos
+python3 scripts/energia_dt.py --reusar                                        # solo vuelve a analizar
+```
+
+Corre `build/tp4 --sin-obstaculos` para cada dt (y semilla), en paralelo, y calcula el observable `max |E(t) − E0| / E0`. Imprime una tabla y guarda `build/energia_dt/energia_dt.png`, con la energía en el tiempo por dt y el observable en función de dt. Requiere el proyecto compilado. Opciones: `--tf`, `--n`, `--dts`, `--seeds`, `--muestreo` (cada cuántos segundos se guarda la energía, 1 ms por defecto), `--jobs` y `--out`.
+
+Con los resultados del grupo (N = 300, 30 s, dos semillas), dt = 1e-5 s conserva la energía con un error máximo de 1e-5 a 2e-5.
+
+## Distribución de velocidades (punto 2.3)
+
+```bash
+python3 scripts/velocidades.py
+python3 scripts/velocidades.py --reps 5 --tf 5 --estacionario 3,4,5  # prueba corta
+python3 scripts/velocidades.py --reusar
+```
+
+Corre realizaciones independientes sin obstáculos. Para cada instante reúne en una única bolsa los módulos de velocidad de las `N` partículas de todas las realizaciones; la bolsa estacionaria además reúne las instantáneas tardías indicadas con `--estacionario`. Guarda histogramas, el ajuste Maxwell-Boltzmann de un parámetro `kBT`, la comparación con `m<v²>/2` y las figuras en `build/resultados/2_3_N100/`.
 
 ## Estructura
 
 ```
 src/main.cpp                  punto de entrada
 scripts/                      análisis y figuras (ver Scripts de análisis)
+scripts/velocidades.py        distribución de velocidades y ajuste MB (punto 2.3)
 include/ y lib/
   types/                      Vector2D, Particle, Obstacle, Board
   simulation/                 Simulation (motor) y SimulationConfig

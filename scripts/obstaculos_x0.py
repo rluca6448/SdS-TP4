@@ -133,9 +133,8 @@ fig, ax = plt.subplots(figsize=(7.5, 4.8))
 for x0 in tipicos:
     t = curvas[(x0, semillas[0])][0]
     fus = np.array([curvas[(x0, s)][1] for s in semillas])
-    m, d = fus.mean(axis=0), fus.std(axis=0, ddof=1) if len(semillas) > 1 else np.zeros_like(fus[0])
-    linea, = ax.plot(t, m, label=f"{x0:.2f}")
-    ax.fill_between(t, np.clip(m - d, 0, 1), np.clip(m + d, 0, 1), alpha=0.2, color=linea.get_color())
+    m = fus.mean(axis=0)
+    ax.plot(t, m, label=f"x0 = {x0:.3f} m" + ("  (mejor)" if validos and x0 == mejor else ""))
 ax.axhline(args.umbral, color="gray", ls=":", lw=1)
 ax.set(xlabel="t (s)", ylabel="fracción de usadas", ylim=(0, 1.02), xlim=(0, args.tf))
 ax.legend(title=r"$x_0$ (m)")
@@ -144,16 +143,18 @@ plt.tight_layout()
 plt.savefig(graf / "fu_vs_t.png", dpi=110)
 plt.close(fig)
 
-# <t90> vs x0, con los puntos individuales y las realizaciones que no llegaron al umbral
+# <t90> vs x0. Para N=20 se muestra solamente el promedio y su desvío: las
+# realizaciones individuales hacían que esa figura resultara difícil de leer.
 fig, ax = plt.subplots(figsize=(7.5, 4.8))
 for x0 in x0s:
     for s in semillas:
         v = t90[(x0, s)]
         if v is None:
             ax.plot(x0, args.tf, "x", color="red", ms=7)
-        else:
+        elif args.n != 20:
             ax.plot(x0, v, ".", color="gray", alpha=0.6)
 ok = [x0 for x0 in x0s if alcanzaron[x0] > 0]
+etiqueta_media = None if args.n == 20 else f"<{etiqueta}> ± desvío (solo las que alcanzan)"
 ax.errorbar(ok, [media[x] for x in ok], yerr=[desvio[x] for x in ok], fmt="o-", capsize=4,
             label=rf"$\langle t_{{{etiqueta[1:]}}}\rangle$")
 ax.plot([], [], "x", color="red", label="no llegan")
