@@ -228,7 +228,7 @@ bool Simulation::isValidLatticeSite(const types::Vector2D& site, double slack) c
 // Las fuerzas solo dependen de las posiciones, asi que la velocidad no entra en la dinamica;
 // se estima para el output con la diferencia hacia atras, que usa a(t+dt) y deja
 // (r, v, a) en el mismo instante.
-// ponytail: v tiene error O(dt^2). Con la centrada de la teorica, v(t) = (r(t+dt) - r(t-dt))/(2dt),
+// Nota: v tiene error O(dt^2). Con la centrada de la teorica, v(t) = (r(t+dt) - r(t-dt))/(2dt),
 // la velocidad quedaria un paso atrasada respecto de la posicion.
 void Simulation::step() {
     const double dt = config.dt;
