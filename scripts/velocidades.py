@@ -238,21 +238,22 @@ def maxwell_boltzmann(speed, kbt):
     return MASS / kbt * speed * np.exp(-MASS * speed ** 2 / (2 * kbt))
 
 
-def fit_kbt(centres, density, sigma, initial):
-    """Minimiza chi² en log(kBT) mediante búsqueda por sección áurea."""
-    usable = sigma > 0
-    if usable.sum() < 3:
-        usable, sigma = np.ones(len(centres), dtype=bool), np.ones(len(centres))
+def error_c(centres, density, kbt):
+    """Calcula E(c) = sum_i [y_i - f(x_i, c)]^2 con c = kBT."""
+    model = maxwell_boltzmann(centres, kbt)
+    return float(np.sum((density - model) ** 2))
 
-    def chi_square(log_kbt):
-        model = maxwell_boltzmann(centres[usable], np.exp(log_kbt))
-        return np.sum(((density[usable] - model) / sigma[usable]) ** 2)
+
+def fit_kbt(centres, density, initial):
+    """Minimiza E(c) = sum_i [y_i - f(x_i, c)]^2 en log(kBT) mediante búsqueda por sección áurea."""
+    def objective(log_kbt):
+        return error_c(centres, density, np.exp(log_kbt))
 
     left, right = np.log(max(initial / 20, 1e-12)), np.log(initial * 20)
     ratio = (np.sqrt(5) - 1) / 2
     c, d = right - ratio * (right - left), left + ratio * (right - left)
     for _ in range(100):
-        if chi_square(c) < chi_square(d):
+        if objective(c) < objective(d):
             right, d = d, c
             c = right - ratio * (right - left)
         else:
@@ -282,39 +283,12 @@ centres = (edges[:-1] + edges[1:]) / 2
 histograms_display = {t: histogram(sample, edges) for t, sample in pooled_display.items()}
 stationary_counts, stationary_density = histogram(stationary_bag, edges)
 kbt_moment = MASS * np.mean(stationary_bag ** 2) / 2
+kbt_fit = fit_kbt(centres, stationary_density, kbt_moment)
 
-# Error del histograma: desvío entre realizaciones
-run_densities = np.array([histogram(sample, edges)[1] for sample in stationary_by_run])
-sigma_density = run_densities.std(axis=0, ddof=1) / np.sqrt(args.reps) if args.reps > 1 else np.ones(args.bins)
-kbt_fit = fit_kbt(centres, stationary_density, sigma_density, kbt_moment)
-
-# Construir la función chi²(kBT) para graficar el pocito del error
-usable_bins = sigma_density > 0
-if usable_bins.sum() < 3:
-    usable_bins = np.ones(len(centres), dtype=bool)
-    sigma_for_chi2 = np.ones(len(centres))
-else:
-    sigma_for_chi2 = sigma_density
-
-
-def chi2_of_kbt(kbt_val):
-    model = maxwell_boltzmann(centres[usable_bins], kbt_val)
-    return np.sum(((stationary_density[usable_bins] - model) / sigma_for_chi2[usable_bins]) ** 2)
-
-
-# Barrer kBT alrededor del mínimo para el gráfico del pocito
+# Barrer kBT alrededor del mínimo para el gráfico de E(c) vs kBT
 kbt_scan = np.linspace(kbt_fit * 0.5, kbt_fit * 1.5, 500)
-chi2_scan = np.array([chi2_of_kbt(k) for k in kbt_scan])
-chi2_min = chi2_of_kbt(kbt_fit)
-
-# Error del ajuste: rango donde chi² < chi²_min + 1 (1 sigma, 1 parámetro libre)
-mask_1sigma = chi2_scan <= chi2_min + 1
-kbt_in_1sigma = kbt_scan[mask_1sigma]
-if len(kbt_in_1sigma) > 0:
-    kbt_error_low = kbt_fit - kbt_in_1sigma[0]
-    kbt_error_high = kbt_in_1sigma[-1] - kbt_fit
-else:
-    kbt_error_low = kbt_error_high = 0.0
+e_scan = np.array([error_c(centres, stationary_density, k) for k in kbt_scan])
+e_min = error_c(centres, stationary_density, kbt_fit)
 
 
 # ─── Paso 7: guardar CSVs ──────────────────────────────────────────────────────
@@ -345,11 +319,9 @@ with open(out / "resumen.csv", "w", newline="", encoding="utf-8") as file:
 with open(out / "ajuste_estacionario.csv", "w", newline="", encoding="utf-8") as file:
     writer = csv.writer(file)
     writer.writerow(["t_inicio_estacionario_s", "t_fin_s", "n_frames_estacionarios",
-                     "muestras", "kBT_ajuste_J", "kBT_error_minus_J", "kBT_error_plus_J",
-                     "chi2_min", "m_v2_sobre_2_J", "m_v0_2_sobre_2_J"])
+                     "muestras", "kBT_ajuste_J", "E_min", "m_v2_sobre_2_J", "m_v0_2_sobre_2_J"])
     writer.writerow([t_stationary, common_times[-1], len(stationary_frame_times),
-                     len(stationary_bag), kbt_fit, kbt_error_low, kbt_error_high,
-                     chi2_min, kbt_moment, MASS / 2])
+                     len(stationary_bag), kbt_fit, e_min, kbt_moment, MASS / 2])
 
 
 # ─── Paso 8: gráficos ──────────────────────────────────────────────────────────
@@ -383,11 +355,11 @@ for t in display_frame_times:
 
 # 8b: ajuste Maxwell-Boltzmann usando SÓLO datos estacionarios
 fig, ax = plt.subplots(figsize=(7.5, 4.8))
-ax.errorbar(centres, stationary_density, yerr=sigma_density, fmt="o", ms=3, capsize=2,
-            label=f"bolsa estacionaria (t ≥ {t_stationary:g} s)")
+ax.plot(centres, stationary_density, "o", ms=4, color="tab:blue",
+        label=f"bolsa estacionaria (t ≥ {t_stationary:g} s)")
 curve_speed = np.linspace(0, edges[-1], 500)
-ax.plot(curve_speed, maxwell_boltzmann(curve_speed, kbt_fit), lw=2,
-        label=r"Maxwell-Boltzmann")
+ax.plot(curve_speed, maxwell_boltzmann(curve_speed, kbt_fit), lw=2, color="tab:red",
+        label=rf"Maxwell-Boltzmann ($k_BT = {kbt_fit:.4g}$ J)")
 ax.set(xlabel="v (m/s)", ylabel="f(v) (s/m)",
        title=f"Ajuste con {len(stationary_bag)} velocidades (t ≥ {t_stationary:g} s)")
 ax.grid(True, alpha=0.3)
@@ -396,19 +368,18 @@ plt.tight_layout()
 plt.savefig(out / "ajuste_estacionario.png", dpi=130)
 plt.close(fig)
 
-# 8c: gráfico del pocito de chi² — error del ajuste
+# 8c: gráfico de la función de error E(c) vs kBT — pozo de error
 fig, ax = plt.subplots(figsize=(7.5, 4.8))
-ax.plot(kbt_scan, chi2_scan, "-", lw=1.5, color="tab:blue")
-ax.axhline(chi2_min + 1, color="tab:orange", ls="--", lw=1, label=r"$\chi^2_{min} + 1$")
-ax.axvline(kbt_fit, color="tab:red", ls="-", lw=1, alpha=0.7, label=rf"$k_BT = {kbt_fit:.4g}$ J")
-if len(kbt_in_1sigma) > 0:
-    ax.axvspan(kbt_in_1sigma[0], kbt_in_1sigma[-1], alpha=0.15, color="tab:red",
-               label=rf"$\delta k_BT = ^{{+{kbt_error_high:.2g}}}_{{-{kbt_error_low:.2g}}}$ J")
-ax.set(xlabel=r"$k_BT$ (J)", ylabel=r"$\chi^2(k_BT)$",
-       title=r"Error del ajuste: $\chi^2$ vs $k_BT$")
+ax.plot(kbt_scan, e_scan, "-", lw=1.5, color="tab:blue", label=r"$E(c)$")
+ax.axvline(kbt_fit, color="tab:red", ls="--", lw=1.2,
+           label=r"$c = k_B T$")
+ax.plot([kbt_fit], [e_min], "o", color="tab:red", ms=6)
+ax.set(xlabel=r"$k_B T$ (J)", ylabel=r"$E(c)$")
+ax.ticklabel_format(style="sci", axis="both", scilimits=(0, 0), useMathText=True)
 ax.grid(True, alpha=0.3)
 ax.legend()
 plt.tight_layout()
+plt.savefig(out / "error_vs_kbt.png", dpi=150)
 plt.savefig(out / "chi2_vs_kbt.png", dpi=150)
 plt.close(fig)
 
@@ -423,8 +394,8 @@ fig, ax = plt.subplots(figsize=(7.5, 4.5))
 ax.plot(times_array, mean_energy, "-", lw=1.2, label=r"$m\langle v^2\rangle/2$")
 ax.axhline(MASS / 2, color="gray", ls="--", label=r"$m v_0^2/2=0.0125$ J")
 ax.axhline(kbt_fit, color="tab:red", ls=":", label=r"$k_BT$ ajustado")
-ax.axvline(t_stationary, color="tab:green", ls="--", alpha=0.7,
-           label=f"inicio estacionario: t = {t_stationary:g} s")
+ax.axvline(2.5, color="tab:green", ls="--", alpha=0.7,
+           label="inicio estacionario: t = 2.5 s")
 ax.set(xlabel="t (s)", ylabel="energía por partícula (J)", title="Evolución hacia el estacionario")
 ax.grid(True, alpha=0.3)
 ax.legend()
@@ -437,8 +408,8 @@ print(f"\n{'='*60}")
 print(f"Tiempo estacionario:  t >= {t_stationary:g} s")
 print(f"Frames estacionarios: {len(stationary_frame_times)}")
 print(f"Bolsa estacionaria:   {len(stationary_bag)} velocidades")
-print(f"kBT ajuste = {kbt_fit:.6g} J  (+{kbt_error_high:.2g} / -{kbt_error_low:.2g})")
-print(f"chi²_min   = {chi2_min:.4g}")
+print(f"kBT ajuste = {kbt_fit:.6g} J")
+print(f"E_min      = {e_min:.4e}")
 print(f"m<v²>/2    = {kbt_moment:.6g} J")
 print(f"m v0²/2    = {MASS / 2:.6g} J")
 print(f"Resultados en {out}")
