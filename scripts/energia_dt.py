@@ -141,7 +141,7 @@ ax[1].xaxis.set_major_formatter(LogFormatterMathtext())
 ax[1].yaxis.set_major_formatter(LogFormatterMathtext())
 ax[1].grid(True, which="both", alpha=0.3)
 plt.tight_layout()
-png = graf / f"energia_dt{args.sufijo}.png"
+png = out / f"energia_dt{args.sufijo}.png"
 plt.savefig(png, dpi=110)
 plt.close(fig)
 
@@ -160,7 +160,7 @@ ax.set(xlabel="t (s)", ylabel="E (J)")
 ax.legend(title="dt (s)", fontsize=8, title_fontsize=8)
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
-png_total = graf / f"energia_total_vs_t{args.sufijo}.png"
+png_total = out / f"energia_total_vs_t{args.sufijo}.png"
 plt.savefig(png_total, dpi=110)
 print(f"\nFigura de la energía total: {png_total}")
 print(f"\nFigura: {png}")
